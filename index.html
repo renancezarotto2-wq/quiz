@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quiz ao vivo</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --teal:#003641; --teal2:#00505F; --turq:#00AE9D; --lime:#C9D200;
+    --sand:#F6F4EC; --ink:#0F2A30;
+    --c1:#E24B4A; --c2:#2F6BFF; --c3:#F2B705; --c4:#7DB61C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:Nunito,system-ui,sans-serif;background:var(--teal);color:#fff;-webkit-font-smoothing:antialiased}
+  button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}
+  button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--lime);outline-offset:3px}
+  input,textarea,select{font:inherit}
+  .tela{display:none;min-height:100vh;padding:24px}
+  .tela.ativa{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+  .tela.topo.ativa{justify-content:flex-start;padding-top:32px}
+  h1{font-weight:900;font-size:clamp(36px,7vw,64px);line-height:1;letter-spacing:-.02em;text-align:center}
+  h2{font-weight:800;font-size:clamp(20px,4vw,30px);text-align:center}
+  p{font-weight:600;opacity:.85;max-width:46ch;text-align:center}
+  .botao{background:var(--lime);color:var(--ink);font-weight:900;font-size:19px;padding:15px 26px;border-radius:14px;min-width:210px;text-align:center;transition:transform .08s}
+  .botao:active{transform:scale(.97)}
+  .botao:disabled{opacity:.4;cursor:not-allowed}
+  .botao.suave{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.4)}
+  .botao.mini{min-width:0;font-size:15px;padding:9px 15px;border-radius:10px}
+  .linha{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .campo{width:100%;padding:14px 16px;border-radius:12px;border:0;font-size:18px;font-weight:700;color:var(--ink);background:var(--sand)}
+  .campo.centro{text-align:center;font-weight:800}
+  .campo.pin{letter-spacing:.35em;font-size:30px;text-align:center;font-weight:900}
+  form{display:flex;flex-direction:column;gap:12px;width:100%;max-width:340px;align-items:center}
+  .erro{background:var(--c1);color:#fff;padding:12px 16px;border-radius:12px;font-weight:700;max-width:460px;text-align:center}
+  .erro:empty{display:none}
+  .carregando{font-weight:800;opacity:.7}
+  .topo-barra{width:100%;max-width:1000px;display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap}
+  .topo-barra .titulo{font-weight:900;font-size:22px}
+  .titulo-clicavel{cursor:default;user-select:none;-webkit-user-select:none}
+
+  .placa{background:var(--sand);color:var(--ink);border-radius:24px;padding:26px 34px;display:flex;gap:34px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .placa .pin{font-size:clamp(56px,11vw,130px);font-weight:900;letter-spacing:.1em;line-height:1}
+  .placa small{display:block;font-weight:700;opacity:.6;font-size:15px;margin-top:6px;word-break:break-all;max-width:340px}
+  #qr{background:#fff;padding:10px;border-radius:12px;line-height:0}
+  .jogadores{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:940px}
+  .jogadores span{background:var(--turq);color:var(--ink);font-weight:900;padding:9px 17px;border-radius:999px;font-size:19px;animation:entrar .25s ease-out}
+  @keyframes entrar{from{transform:scale(.6);opacity:0}}
+  .contador{font-weight:800;opacity:.8}
+
+  .cabecalho{width:100%;max-width:1000px;display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:18px;opacity:.8}
+  .enunciado{background:var(--sand);color:var(--ink);border-radius:20px;padding:28px 32px;font-size:clamp(22px,3.4vw,40px);font-weight:900;text-align:center;max-width:1000px;width:100%;line-height:1.2}
+  .relogio{width:96px;height:96px;border-radius:50%;background:var(--turq);color:var(--ink);display:grid;place-items:center;font-size:42px;font-weight:900}
+  .relogio.acabando{background:var(--c1);color:#fff;animation:pulsar .6s infinite}
+  @keyframes pulsar{50%{transform:scale(1.08)}}
+  .alternativas{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:100%;max-width:1000px}
+  .alt{display:flex;align-items:center;gap:14px;padding:20px 22px;border-radius:16px;font-weight:800;font-size:clamp(16px,2vw,24px);color:#fff;text-align:left;min-height:88px;position:relative;transition:transform .08s,opacity .2s}
+  .alt:active{transform:scale(.98)}
+  .alt .marca{font-size:26px;flex:none;width:34px;text-align:center}
+  .alt.a1{background:var(--c1)} .alt.a2{background:var(--c2)} .alt.a3{background:var(--c3);color:var(--ink)} .alt.a4{background:var(--c4)}
+  .alt.apagada{opacity:.28}
+  .alt .qtd{position:absolute;right:16px;font-weight:900;font-size:22px}
+  .respondidos{font-weight:800;font-size:20px;opacity:.85}
+
+  .ranking{width:100%;max-width:620px;display:flex;flex-direction:column;gap:10px}
+  .ranking .item{display:flex;align-items:center;gap:14px;background:var(--teal2);border-radius:14px;padding:14px 18px;font-weight:800;font-size:20px}
+  .ranking .item b{font-size:22px;width:34px;opacity:.6}
+  .ranking .item .nome{flex:1}
+  .podio{display:flex;align-items:flex-end;gap:16px;justify-content:center;flex-wrap:wrap}
+  .degrau{background:var(--sand);color:var(--ink);border-radius:18px 18px 0 0;padding:18px 22px;text-align:center;font-weight:900;min-width:150px;display:flex;flex-direction:column;justify-content:flex-end}
+  .degrau .pos{font-size:34px} .degrau .nome{font-size:22px;margin:6px 0} .degrau .pts{font-size:18px;opacity:.65}
+  .degrau.p1{height:230px;background:var(--lime)} .degrau.p2{height:190px} .degrau.p3{height:160px}
+
+  .apelido{background:var(--turq);color:var(--ink);padding:9px 20px;border-radius:999px;font-weight:900;font-size:20px}
+  .aviso{font-size:clamp(26px,6vw,38px);font-weight:900;text-align:center;line-height:1.2}
+  .painel{border-radius:20px;padding:28px 24px;width:100%;max-width:440px;text-align:center;font-weight:900}
+  .painel.ok{background:var(--c4)} .painel.nok{background:var(--c1)}
+  .painel .icone{font-size:56px} .painel .msg{font-size:26px;margin:8px 0} .painel .pts{font-size:20px;opacity:.85}
+  .placar-mini{font-weight:900;font-size:20px;opacity:.9}
+
+  .editor{width:100%;max-width:820px;display:flex;flex-direction:column;gap:14px}
+  .cartao{background:var(--teal2);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:10px}
+  .cartao .cab{display:flex;justify-content:space-between;align-items:center;font-weight:900;gap:10px;flex-wrap:wrap}
+  .grade2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .opcao{display:flex;align-items:center;gap:8px}
+  .opcao input[type=radio]{width:22px;height:22px;accent-color:var(--lime);flex:none}
+  .lista-quiz{width:100%;max-width:660px;display:flex;flex-direction:column;gap:10px}
+  .lista-quiz .item{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--teal2);border-radius:14px;padding:14px 18px;font-weight:800;flex-wrap:wrap}
+  .vazio{opacity:.7;font-weight:700;text-align:center;padding:20px}
+  label.rot{font-weight:800;font-size:14px;opacity:.8}
+  .rodape{position:fixed;bottom:10px;right:14px;font-size:12px;font-weight:700;opacity:.28}
+
+  @media (max-width:640px){
+    .alternativas{grid-template-columns:1fr}
+    .alt{min-height:72px;padding:16px 18px}
+    .grade2{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= INÍCIO / ENTRAR ================= -->
+<section id="tela-inicio" class="tela ativa">
+  <h1 class="titulo-clicavel" id="titulo-app">Quiz ao vivo</h1>
+  <p>Digite o código que está na tela do host.</p>
+  <form onsubmit="entrarSala(event)">
+    <input class="campo pin" id="in-pin" inputmode="numeric" maxlength="6" placeholder="PIN" autocomplete="off" required>
+    <input class="campo centro" id="in-nome" maxlength="16" placeholder="Seu apelido" autocomplete="off" required>
+    <button class="botao" type="submit">Entrar</button>
+  </form>
+  <div id="erro-inicio" class="erro"></div>
+  <div class="linha" id="area-admin" style="display:none">
+    <button class="botao mini suave" onclick="abrirEscolha()">Apresentar um quiz</button>
+    <button class="botao mini suave" onclick="abrirLista()">Gerenciar quizzes</button>
+  </div>
+  <button class="rodape" id="ponto-admin" onclick="pedirSenha()" title="Acesso do host">host</button>
+</section>
+
+<!-- ================= LISTA DE QUIZZES ================= -->
+<section id="tela-lista" class="tela topo">
+  <div class="topo-barra">
+    <span class="titulo">Quizzes</span>
+    <div class="linha">
+      <button class="botao mini" onclick="novoQuiz()">Novo quiz</button>
+      <button class="botao mini suave" onclick="document.getElementById('arq-json').click()">Importar JSON</button>
+      <button class="botao mini suave" onclick="document.getElementById('arq-xlsx').click()">Importar Excel</button>
+      <button class="botao mini suave" onclick="irPara('inicio')">Voltar</button>
+    </div>
+  </div>
+  <div class="lista-quiz" id="lista-quizzes"></div>
+  <input type="file" id="arq-json" accept=".json" hidden onchange="importarJson(this)">
+  <input type="file" id="arq-xlsx" accept=".xlsx,.xls,.csv" hidden onchange="importarExcel(this)">
+  <p style="margin-top:10px">Os quizzes ficam salvos no Firebase, então aparecem em qualquer computador.<br>Para importar do Excel use as colunas: pergunta, A, B, C, D, correta (A/B/C/D), tempo.</p>
+</section>
+
+<!-- ================= EDITOR ================= -->
+<section id="tela-editor" class="tela topo">
+  <div class="topo-barra">
+    <span class="titulo">Editar quiz</span>
+    <div class="linha">
+      <button class="botao mini" onclick="salvarQuiz()">Salvar</button>
+      <button class="botao mini suave" onclick="exportarQuiz()">Exportar JSON</button>
+      <button class="botao mini suave" onclick="abrirLista()">Voltar</button>
+    </div>
+  </div>
+  <div class="editor">
+    <input class="campo" id="ed-titulo" placeholder="Nome do quiz">
+    <div id="ed-perguntas" style="display:flex;flex-direction:column;gap:14px"></div>
+    <button class="botao" onclick="addPergunta()">Adicionar pergunta</button>
+  </div>
+</section>
+
+<!-- ================= HOST: ESCOLHER QUIZ ================= -->
+<section id="tela-escolha" class="tela topo">
+  <div class="topo-barra">
+    <span class="titulo">Qual quiz vamos jogar?</span>
+    <button class="botao mini suave" onclick="irPara('inicio')">Voltar</button>
+  </div>
+  <div class="lista-quiz" id="lista-escolha"></div>
+</section>
+
+<!-- ================= HOST: LOBBY ================= -->
+<section id="tela-host-lobby" class="tela">
+  <h2>Entre pelo celular com o código</h2>
+  <div class="placa">
+    <div>
+      <div class="pin" id="host-pin">------</div>
+      <small id="host-link"></small>
+    </div>
+    <div id="qr"></div>
+  </div>
+  <div class="contador" id="host-contador">Aguardando jogadores…</div>
+  <div class="jogadores" id="host-jogadores"></div>
+  <div class="linha">
+    <button class="botao" id="btn-iniciar" onclick="iniciarPartida()" disabled>Iniciar partida</button>
+    <button class="botao suave" onclick="encerrarSala()">Cancelar</button>
+  </div>
+</section>
+
+<!-- ================= HOST: PERGUNTA ================= -->
+<section id="tela-host-pergunta" class="tela topo">
+  <div class="cabecalho">
+    <span id="hp-contagem"></span>
+    <span id="hp-respondidos" class="respondidos"></span>
+  </div>
+  <div class="relogio" id="hp-relogio">20</div>
+  <div class="enunciado" id="hp-enunciado"></div>
+  <div class="alternativas" id="hp-alternativas"></div>
+  <button class="botao suave mini" onclick="encerrarPergunta()">Encerrar agora</button>
+</section>
+
+<!-- ================= HOST: RESULTADO ================= -->
+<section id="tela-host-resultado" class="tela topo">
+  <h2 id="hr-titulo">Resposta certa</h2>
+  <div class="enunciado" id="hr-enunciado"></div>
+  <div class="alternativas" id="hr-alternativas"></div>
+  <button class="botao" onclick="mostrarRanking()">Ver ranking</button>
+</section>
+
+<!-- ================= HOST: RANKING ================= -->
+<section id="tela-host-ranking" class="tela topo">
+  <h2>Ranking</h2>
+  <div class="ranking" id="hk-ranking"></div>
+  <button class="botao" id="btn-proxima" onclick="proximaPergunta()">Próxima pergunta</button>
+</section>
+
+<!-- ================= HOST: PÓDIO ================= -->
+<section id="tela-host-podio" class="tela">
+  <h1>Fim de jogo</h1>
+  <div class="podio" id="hp-podio"></div>
+  <div class="ranking" id="hp-restantes"></div>
+  <button class="botao" onclick="location.reload()">Novo jogo</button>
+</section>
+
+<!-- ================= JOGADOR: LOBBY ================= -->
+<section id="tela-jogador-lobby" class="tela">
+  <div class="apelido" id="jog-nome"></div>
+  <div class="aviso">Você está dentro!</div>
+  <p id="jog-status">Aguardando o host iniciar…</p>
+</section>
+
+<!-- ================= JOGADOR: RESPONDER ================= -->
+<section id="tela-jogador-responder" class="tela topo">
+  <div class="cabecalho">
+    <span id="jr-contagem"></span>
+    <span id="jr-tempo" class="respondidos"></span>
+  </div>
+  <div class="enunciado" id="jr-enunciado" style="font-size:clamp(18px,4.5vw,26px);padding:18px 20px"></div>
+  <div class="alternativas" id="jr-alternativas"></div>
+  <div id="jr-aviso" class="aviso" style="display:none">Resposta enviada!</div>
+</section>
+
+<!-- ================= JOGADOR: FEEDBACK ================= -->
+<section id="tela-jogador-feedback" class="tela">
+  <div class="painel" id="jf-painel">
+    <div class="icone" id="jf-icone"></div>
+    <div class="msg" id="jf-msg"></div>
+    <div class="pts" id="jf-pts"></div>
+  </div>
+  <div class="placar-mini" id="jf-total"></div>
+  <p>Olhe para a tela do host.</p>
+</section>
+
+<!-- ================= JOGADOR: FIM ================= -->
+<section id="tela-jogador-fim" class="tela">
+  <h1 id="jfim-pos"></h1>
+  <div class="apelido" id="jfim-nome"></div>
+  <div class="placar-mini" id="jfim-pts"></div>
+  <button class="botao suave" onclick="location.reload()">Sair</button>
+</section>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+/* =====================================================================
+   CONFIGURAÇÃO
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyC_dTC-qu4E73xPZPVYmfckuU2EVDMMyAg",
+  authDomain: "quiz-ao-vivo.firebaseapp.com",
+  databaseURL: "https://quiz-ao-vivo-default-rtdb.firebaseio.com",
+  projectId: "quiz-ao-vivo",
+  storageBucket: "quiz-ao-vivo.firebasestorage.app",
+  messagingSenderId: "55587200829",
+  appId: "1:55587200829:web:5d570dcd6feb4d0f952f54"
+};
+
+// Senha para criar salas e editar quizzes. Troque por outra quando quiser.
+const SENHA_HOST = "sicoob2026";
+
+let db = null;
+try {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.database();
+} catch (e) {
+  document.getElementById("erro-inicio").textContent = "Não conectou ao Firebase: " + e.message;
+}
+
+const MARCAS = ["\u25B2", "\u25C6", "\u25CF", "\u25A0"];
+const PONTOS_BASE = 1000, PONTOS_MIN = 500, BONUS_SEQ = 100, BONUS_MAX = 500;
+
+const $ = id => document.getElementById(id);
+function irPara(nome){
+  document.querySelectorAll(".tela").forEach(t => t.classList.remove("ativa"));
+  $("tela-" + nome).classList.add("ativa");
+  window.scrollTo(0,0);
+}
+const gerarPin = () => String(Math.floor(100000 + Math.random()*900000));
+const gerarId  = () => Math.random().toString(36).slice(2,10);
+const salaRef  = pin => db.ref("salas/" + pin);
+function linkDaSala(pin){ const u = new URL(location.href); u.search = "?pin=" + pin; u.hash = ""; return u.href; }
+const escapar = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function botaoMini(txt, fn, suave){
+  const b = document.createElement("button");
+  b.className = "botao mini" + (suave ? " suave" : "");
+  b.textContent = txt; b.onclick = fn; return b;
+}
+
+/* ---------- som ---------- */
+let ctxAudio = null;
+function bip(freq, dur, tipo){
+  try{
+    ctxAudio = ctxAudio || new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctxAudio.createOscillator(), g = ctxAudio.createGain();
+    o.type = tipo || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(.12, ctxAudio.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, ctxAudio.currentTime + dur);
+    o.connect(g); g.connect(ctxAudio.destination); o.start(); o.stop(ctxAudio.currentTime + dur);
+  }catch(e){}
+}
+const somAcerto = () => { bip(660,.15); setTimeout(()=>bip(880,.25),140); };
+const somErro   = () => bip(180,.35,"square");
+const somFim    = () => bip(440,.3,"triangle");
+
+/* =====================================================================
+   ACESSO DO HOST (senha estática)
+   ===================================================================== */
+function ehHost(){ return sessionStorage.getItem("host-ok") === "1"; }
+function mostrarAreaAdmin(){
+  $("area-admin").style.display = "flex";
+  $("ponto-admin").style.display = "none";
+}
+function pedirSenha(){
+  const s = prompt("Senha do host:");
+  if (s === null) return;
+  if (s === SENHA_HOST) { sessionStorage.setItem("host-ok","1"); mostrarAreaAdmin(); }
+  else alert("Senha incorreta.");
+}
+// atalho: 3 toques no título também abre o pedido de senha
+let toques = 0, relogioToques = null;
+$("titulo-app").onclick = () => {
+  if (ehHost()) return;
+  toques++; clearTimeout(relogioToques);
+  relogioToques = setTimeout(() => toques = 0, 1200);
+  if (toques >= 3) { toques = 0; pedirSenha(); }
+};
+if (ehHost() || location.hash === "#host") {
+  if (ehHost()) mostrarAreaAdmin(); else pedirSenha();
+}
+
+/* =====================================================================
+   QUIZZES NO FIREBASE
+   ===================================================================== */
+const quizzesRef = () => db.ref("quizzes");
+async function lerQuizzes(){
+  const s = await quizzesRef().get();
+  const obj = s.val() || {};
+  return Object.entries(obj).map(([id,q]) => Object.assign({}, q, {id}))
+    .sort((a,b) => String(a.titulo).localeCompare(String(b.titulo)));
+}
+const gravarQuiz = q => quizzesRef().child(q.id).set({ titulo:q.titulo, perguntas:q.perguntas, atualizado: Date.now() });
+const apagarQuiz = id => quizzesRef().child(id).remove();
+
+async function garantirExemplo(){
+  const s = await quizzesRef().get();
+  if (s.exists()) return;
+  await gravarQuiz({ id: gerarId(), titulo:"Quiz de exemplo", perguntas:[
+    { texto:"Qual o maior planeta do Sistema Solar?", opcoes:["Marte","Júpiter","Saturno","Netuno"], correta:1, tempo:20 },
+    { texto:"Em que ano o homem pisou na Lua pela primeira vez?", opcoes:["1965","1969","1972","1958"], correta:1, tempo:20 },
+    { texto:"Qual desses é um mamífero?", opcoes:["Tubarão","Golfinho","Polvo","Tartaruga"], correta:1, tempo:15 }
+  ]});
+}
+
+function desenharListaQuiz(alvo, quizzes, modo){
+  alvo.innerHTML = "";
+  if (!quizzes.length) { alvo.innerHTML = '<div class="vazio">Nenhum quiz cadastrado ainda.</div>'; return; }
+  quizzes.forEach(q => {
+    const n = (q.perguntas || []).length;
+    const d = document.createElement("div"); d.className = "item";
+    d.innerHTML = '<span>' + escapar(q.titulo) + ' <small style="opacity:.6">' + n + (n===1?' pergunta':' perguntas') + '</small></span>';
+    const acoes = document.createElement("div"); acoes.className = "linha";
+    if (modo === "apresentar") acoes.appendChild(botaoMini("Apresentar", () => criarSala(q)));
+    else {
+      acoes.appendChild(botaoMini("Editar", () => editarQuiz(q.id)));
+      acoes.appendChild(botaoMini("Duplicar", async () => { await gravarQuiz({ id: gerarId(), titulo: q.titulo + " (cópia)", perguntas: q.perguntas }); abrirLista(); }, true));
+      acoes.appendChild(botaoMini("Excluir", async () => {
+        if (confirm('Excluir "' + q.titulo + '"?')) { await apagarQuiz(q.id); abrirLista(); }
+      }, true));
+    }
+    d.appendChild(acoes); alvo.appendChild(d);
+  });
+}
+
+async function abrirLista(){
+  if (!ehHost()) return pedirSenha();
+  irPara("lista");
+  $("lista-quizzes").innerHTML = '<div class="carregando">Carregando…</div>';
+  try { await garantirExemplo(); desenharListaQuiz($("lista-quizzes"), await lerQuizzes(), "editar"); }
+  catch(e){ $("lista-quizzes").innerHTML = '<div class="erro">Não consegui ler os quizzes: ' + escapar(e.message) + '</div>'; }
+}
+async function abrirEscolha(){
+  if (!ehHost()) return pedirSenha();
+  irPara("escolha");
+  $("lista-escolha").innerHTML = '<div class="carregando">Carregando…</div>';
+  try { await garantirExemplo(); desenharListaQuiz($("lista-escolha"), await lerQuizzes(), "apresentar"); }
+  catch(e){ $("lista-escolha").innerHTML = '<div class="erro">Não consegui ler os quizzes: ' + escapar(e.message) + '</div>'; }
+}
+
+/* =====================================================================
+   EDITOR
+   ===================================================================== */
+let quizEditando = null;
+
+function novoQuiz(){
+  quizEditando = { id: gerarId(), titulo:"", perguntas:[{ texto:"", opcoes:["","","",""], correta:0, tempo:20 }] };
+  desenharEditor();
+}
+async function editarQuiz(id){
+  const q = (await lerQuizzes()).find(x => x.id === id);
+  quizEditando = JSON.parse(JSON.stringify(q));
+  quizEditando.perguntas = (quizEditando.perguntas || []).map(p => ({
+    texto: p.texto || "", opcoes: (p.opcoes || ["","","",""]).concat(["","","",""]).slice(0,4),
+    correta: p.correta || 0, tempo: p.tempo || 20
+  }));
+  desenharEditor();
+}
+function desenharEditor(){
+  $("ed-titulo").value = quizEditando.titulo;
+  const alvo = $("ed-perguntas"); alvo.innerHTML = "";
+  quizEditando.perguntas.forEach((p, i) => {
+    const c = document.createElement("div"); c.className = "cartao";
+    const cab = document.createElement("div"); cab.className = "cab";
+    cab.innerHTML = "<span>Pergunta " + (i+1) + "</span>";
+    const acoes = document.createElement("div"); acoes.className = "linha";
+    if (i > 0) acoes.appendChild(botaoMini("\u2191", () => { const t = quizEditando.perguntas; [t[i-1],t[i]] = [t[i],t[i-1]]; desenharEditor(); }, true));
+    if (i < quizEditando.perguntas.length-1) acoes.appendChild(botaoMini("\u2193", () => { const t = quizEditando.perguntas; [t[i+1],t[i]] = [t[i],t[i+1]]; desenharEditor(); }, true));
+    acoes.appendChild(botaoMini("Remover", () => { quizEditando.perguntas.splice(i,1); desenharEditor(); }, true));
+    cab.appendChild(acoes); c.appendChild(cab);
+
+    const txt = document.createElement("input");
+    txt.className = "campo"; txt.placeholder = "Enunciado da pergunta"; txt.value = p.texto;
+    txt.oninput = e => p.texto = e.target.value; c.appendChild(txt);
+
+    const grade = document.createElement("div"); grade.className = "grade2";
+    p.opcoes.forEach((op, j) => {
+      const cx = document.createElement("div"); cx.className = "opcao";
+      const r = document.createElement("input");
+      r.type = "radio"; r.name = "correta-" + i; r.checked = p.correta === j; r.title = "Marcar como correta";
+      r.onchange = () => p.correta = j;
+      const inp = document.createElement("input");
+      inp.className = "campo"; inp.placeholder = "Alternativa " + MARCAS[j]; inp.value = op;
+      inp.oninput = e => p.opcoes[j] = e.target.value;
+      cx.appendChild(r); cx.appendChild(inp); grade.appendChild(cx);
+    });
+    c.appendChild(grade);
+
+    const rod = document.createElement("div"); rod.className = "linha"; rod.style.justifyContent = "flex-start";
+    const rot = document.createElement("label"); rot.className = "rot"; rot.textContent = "Tempo (segundos)";
+    const tempo = document.createElement("input");
+    tempo.type = "number"; tempo.min = 5; tempo.max = 120; tempo.value = p.tempo;
+    tempo.className = "campo centro"; tempo.style.maxWidth = "110px";
+    tempo.oninput = e => p.tempo = Math.max(5, Math.min(120, +e.target.value || 20));
+    rod.appendChild(rot); rod.appendChild(tempo); c.appendChild(rod);
+    alvo.appendChild(c);
+  });
+  irPara("editor");
+}
+function addPergunta(){
+  quizEditando.perguntas.push({ texto:"", opcoes:["","","",""], correta:0, tempo:20 });
+  desenharEditor(); window.scrollTo(0, document.body.scrollHeight);
+}
+async function salvarQuiz(){
+  quizEditando.titulo = $("ed-titulo").value.trim() || "Quiz sem nome";
+  const ruim = quizEditando.perguntas.find(p => !p.texto.trim() || p.opcoes.filter(o => o.trim()).length < 2);
+  if (ruim) { alert("Cada pergunta precisa de um enunciado e de pelo menos duas alternativas preenchidas."); return; }
+  try { await gravarQuiz(quizEditando); abrirLista(); }
+  catch(e){ alert("Não consegui salvar: " + e.message); }
+}
+function exportarQuiz(){
+  quizEditando.titulo = $("ed-titulo").value.trim() || "Quiz sem nome";
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(quizEditando, null, 2)], {type:"application/json"}));
+  a.download = quizEditando.titulo.replace(/[^\w\s-]/g,"") + ".json"; a.click();
+}
+function importarJson(input){
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try{
+      const q = JSON.parse(r.result);
+      if (!q.perguntas || !Array.isArray(q.perguntas)) throw new Error("formato inválido");
+      await gravarQuiz({ id: gerarId(), titulo: q.titulo || f.name.replace(/\.[^.]+$/,""), perguntas: q.perguntas });
+      abrirLista();
+    }catch(e){ alert("Arquivo JSON inválido: " + e.message); }
+  };
+  r.readAsText(f); input.value = "";
+}
+function importarExcel(input){
+  const f = input.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = async () => {
+    try{
+      const wb = XLSX.read(new Uint8Array(r.result), {type:"array"});
+      const linhas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {defval:""});
+      const perguntas = [];
+      linhas.forEach(l => {
+        const chave = n => { const k = Object.keys(l).find(x => x.trim().toLowerCase() === n); return k ? String(l[k]).trim() : ""; };
+        const texto = chave("pergunta"); if (!texto) return;
+        const opcoes = ["a","b","c","d"].map(chave);
+        let c = chave("correta").toUpperCase();
+        let correta = "ABCD".indexOf(c); if (correta < 0) correta = (parseInt(c,10) || 1) - 1;
+        perguntas.push({ texto, opcoes, correta: Math.max(0, Math.min(3, correta)), tempo: parseInt(chave("tempo"),10) || 20 });
+      });
+      if (!perguntas.length) { alert("Nenhuma pergunta encontrada. Confira as colunas: pergunta, A, B, C, D, correta, tempo."); return; }
+      await gravarQuiz({ id: gerarId(), titulo: f.name.replace(/\.[^.]+$/,""), perguntas });
+      abrirLista();
+    }catch(e){ alert("Não consegui ler a planilha: " + e.message); }
+  };
+  r.readAsArrayBuffer(f); input.value = "";
+}
+
+/* =====================================================================
+   HOST
+   ===================================================================== */
+let hostPin = null, quizAtivo = null, idx = -1, jogadoresCache = {}, cronometro = null, ouvindoRespostas = null;
+
+async function criarSala(quiz){
+  if (!db || !ehHost()) return;
+  quizAtivo = quiz; hostPin = gerarPin(); idx = -1;
+  await salaRef(hostPin).set({
+    status:"lobby", criadaEm: Date.now(), perguntaAtual:-1,
+    total: quiz.perguntas.length, titulo: quiz.titulo
+  });
+  salaRef(hostPin).onDisconnect().remove();
+
+  $("host-pin").textContent = hostPin;
+  const link = linkDaSala(hostPin);
+  $("host-link").textContent = link.replace(/^https?:\/\//, "");
+  $("qr").innerHTML = "";
+  new QRCode($("qr"), { text: link, width:160, height:160 });
+
+  salaRef(hostPin).child("jogadores").on("value", snap => {
+    jogadoresCache = snap.val() || {};
+    const nomes = Object.values(jogadoresCache).map(j => j.nome);
+    const lista = $("host-jogadores"); lista.innerHTML = "";
+    nomes.forEach(n => { const s = document.createElement("span"); s.textContent = n; lista.appendChild(s); });
+    $("host-contador").textContent = nomes.length === 0 ? "Aguardando jogadores…"
+      : nomes.length === 1 ? "1 jogador na sala" : nomes.length + " jogadores na sala";
+    $("btn-iniciar").disabled = nomes.length === 0;
+  });
+  irPara("host-lobby");
+}
+function encerrarSala(){ if (hostPin) salaRef(hostPin).remove(); location.reload(); }
+function iniciarPartida(){ idx = -1; proximaPergunta(); }
+
+async function proximaPergunta(){
+  idx++;
+  if (idx >= quizAtivo.perguntas.length) return finalizar();
+  const p = quizAtivo.perguntas[idx];
+  const opcoes = p.opcoes.filter(o => String(o).trim() !== "");
+  await salaRef(hostPin).update({
+    status:"pergunta", perguntaAtual: idx, inicioPergunta: Date.now(), tempo: p.tempo,
+    pergunta: { texto:p.texto, opcoes }, resultado: null
+  });
+
+  $("hp-contagem").textContent = "Pergunta " + (idx+1) + " de " + quizAtivo.perguntas.length;
+  $("hp-enunciado").textContent = p.texto;
+  const alvo = $("hp-alternativas"); alvo.innerHTML = "";
+  opcoes.forEach((o,j) => {
+    const d = document.createElement("div"); d.className = "alt a" + (j+1);
+    d.innerHTML = '<span class="marca">' + MARCAS[j] + '</span><span>' + escapar(o) + '</span>';
+    alvo.appendChild(d);
+  });
+  irPara("host-pergunta");
+
+  const totalJog = Object.keys(jogadoresCache).length;
+  $("hp-respondidos").textContent = "0 de " + totalJog + " responderam";
+  if (ouvindoRespostas) ouvindoRespostas.off();
+  ouvindoRespostas = salaRef(hostPin).child("respostas/" + idx);
+  ouvindoRespostas.on("value", s => {
+    const n = s.numChildren();
+    $("hp-respondidos").textContent = n + " de " + totalJog + " responderam";
+    if (totalJog > 0 && n >= totalJog) encerrarPergunta();
+  });
+
+  let resta = p.tempo;
+  const rel = $("hp-relogio"); rel.textContent = resta; rel.classList.remove("acabando");
+  clearInterval(cronometro);
+  cronometro = setInterval(() => {
+    resta--; rel.textContent = Math.max(0, resta);
+    if (resta <= 5) rel.classList.add("acabando");
+    if (resta <= 0) encerrarPergunta();
+  }, 1000);
+}
+
+async function encerrarPergunta(){
+  clearInterval(cronometro); cronometro = null;
+  if (ouvindoRespostas) { ouvindoRespostas.off(); ouvindoRespostas = null; }
+  if (!$("tela-host-pergunta").classList.contains("ativa")) return;
+
+  const p = quizAtivo.perguntas[idx];
+  const opcoes = p.opcoes.filter(o => String(o).trim() !== "");
+  const snap = await salaRef(hostPin).child("respostas/" + idx).get();
+  const respostas = snap.val() || {};
+  const contagem = opcoes.map(() => 0);
+  const atualizacoes = {};
+
+  Object.entries(respostas).forEach(([id, r]) => {
+    if (contagem[r.opcao] !== undefined) contagem[r.opcao]++;
+    const jog = jogadoresCache[id]; if (!jog) return;
+    let ganhos = 0, seq = jog.sequencia || 0;
+    if (r.opcao === p.correta) {
+      const fracao = Math.min(1, (r.tempoMs || 0) / (p.tempo * 1000));
+      ganhos = Math.round(Math.max(PONTOS_MIN, PONTOS_BASE * (1 - fracao * .5)));
+      seq++; ganhos += Math.min(BONUS_MAX, (seq - 1) * BONUS_SEQ);
+    } else seq = 0;
+    atualizacoes["jogadores/" + id + "/pontos"] = (jog.pontos || 0) + ganhos;
+    atualizacoes["jogadores/" + id + "/sequencia"] = seq;
+    atualizacoes["respostas/" + idx + "/" + id + "/ganhos"] = ganhos;
+  });
+  atualizacoes["status"] = "resultado";
+  atualizacoes["resultado"] = { correta: p.correta, contagem };
+  await salaRef(hostPin).update(atualizacoes);
+
+  $("hr-enunciado").textContent = p.texto;
+  const alvo = $("hr-alternativas"); alvo.innerHTML = "";
+  opcoes.forEach((o,j) => {
+    const d = document.createElement("div");
+    d.className = "alt a" + (j+1) + (j === p.correta ? "" : " apagada");
+    d.innerHTML = '<span class="marca">' + MARCAS[j] + '</span><span>' + escapar(o) + '</span>' +
+                  '<span class="qtd">' + contagem[j] + (j === p.correta ? " \u2713" : "") + '</span>';
+    alvo.appendChild(d);
+  });
+  const acertos = contagem[p.correta] || 0;
+  $("hr-titulo").textContent = acertos === 1 ? "1 pessoa acertou" : acertos + " pessoas acertaram";
+  irPara("host-resultado");
+}
+
+async function mostrarRanking(){
+  await salaRef(hostPin).update({ status:"ranking" });
+  const snap = await salaRef(hostPin).child("jogadores").get();
+  jogadoresCache = snap.val() || {};
+  const lista = Object.values(jogadoresCache).sort((a,b) => (b.pontos||0)-(a.pontos||0)).slice(0,5);
+  const alvo = $("hk-ranking"); alvo.innerHTML = "";
+  lista.forEach((j,i) => {
+    const d = document.createElement("div"); d.className = "item";
+    d.innerHTML = "<b>" + (i+1) + "</b><span class='nome'>" + escapar(j.nome) + "</span><span>" + (j.pontos||0) + "</span>";
+    alvo.appendChild(d);
+  });
+  $("btn-proxima").textContent = (idx + 1 >= quizAtivo.perguntas.length) ? "Ver resultado final" : "Próxima pergunta";
+  irPara("host-ranking");
+}
+
+async function finalizar(){
+  await salaRef(hostPin).update({ status:"fim" });
+  const snap = await salaRef(hostPin).child("jogadores").get();
+  const lista = Object.values(snap.val() || {}).sort((a,b) => (b.pontos||0)-(a.pontos||0));
+  const podio = $("hp-podio"); podio.innerHTML = "";
+  [1,0,2].forEach(pos => {
+    const j = lista[pos]; if (!j) return;
+    const d = document.createElement("div"); d.className = "degrau p" + (pos+1);
+    d.innerHTML = '<div class="pos">' + (pos+1) + '\u00BA</div><div class="nome">' + escapar(j.nome) + '</div><div class="pts">' + (j.pontos||0) + '</div>';
+    podio.appendChild(d);
+  });
+  const resto = $("hp-restantes"); resto.innerHTML = "";
+  lista.slice(3, 10).forEach((j,i) => {
+    const d = document.createElement("div"); d.className = "item";
+    d.innerHTML = "<b>" + (i+4) + "</b><span class='nome'>" + escapar(j.nome) + "</span><span>" + (j.pontos||0) + "</span>";
+    resto.appendChild(d);
+  });
+  somFim(); irPara("host-podio");
+  setTimeout(() => salaRef(hostPin).onDisconnect().cancel(), 500);
+}
+
+/* =====================================================================
+   JOGADOR
+   ===================================================================== */
+let jogadorId = null, jogadorPin = null, meuRef = null, respondi = false, idxLocal = -1, cronoJog = null;
+
+async function entrarSala(ev){
+  ev.preventDefault();
+  if (!db) return;
+  const erro = $("erro-inicio"); erro.textContent = "";
+  const pin = $("in-pin").value.trim(), nome = $("in-nome").value.trim();
+  let snap;
+  try { snap = await salaRef(pin).get(); }
+  catch(e){ erro.textContent = "Sem conexão com o servidor do quiz."; return; }
+  if (!snap.exists())                { erro.textContent = "Sala não encontrada. Confira o PIN na tela do host."; return; }
+  if (snap.val().status !== "lobby") { erro.textContent = "Essa partida já começou."; return; }
+  const nomes = Object.values(snap.val().jogadores || {}).map(j => j.nome.toLowerCase());
+  if (nomes.includes(nome.toLowerCase())) { erro.textContent = "Já tem alguém com esse apelido. Escolha outro."; return; }
+
+  jogadorId = gerarId(); jogadorPin = pin;
+  meuRef = salaRef(pin).child("jogadores/" + jogadorId);
+  await meuRef.set({ nome, pontos:0, sequencia:0, entrouEm: Date.now() });
+  meuRef.onDisconnect().remove();
+  $("jog-nome").textContent = nome; $("jfim-nome").textContent = nome;
+  irPara("jogador-lobby");
+  salaRef(pin).on("value", s => estadoMudou(s.val()));
+}
+
+function estadoMudou(sala){
+  if (!sala) { $("jog-status").textContent = "O host encerrou a sala."; irPara("jogador-lobby"); return; }
+  const eu = (sala.jogadores || {})[jogadorId];
+  if (sala.status === "lobby") { $("jog-status").textContent = "Aguardando o host iniciar…"; return; }
+  if (meuRef) meuRef.onDisconnect().cancel();
+
+  if (sala.status === "pergunta") {
+    if (sala.perguntaAtual !== idxLocal) { idxLocal = sala.perguntaAtual; respondi = false; desenharPergunta(sala); }
+    return;
+  }
+  if (sala.status === "resultado") { clearInterval(cronoJog); mostrarFeedback(sala, eu); return; }
+  if (sala.status === "ranking") { $("jf-total").textContent = "Você tem " + ((eu && eu.pontos) || 0) + " pontos"; return; }
+  if (sala.status === "fim") {
+    const lista = Object.entries(sala.jogadores || {}).sort((a,b) => (b[1].pontos||0)-(a[1].pontos||0));
+    const pos = lista.findIndex(([id]) => id === jogadorId) + 1;
+    $("jfim-pos").textContent = pos + "\u00BA lugar";
+    $("jfim-pts").textContent = ((eu && eu.pontos) || 0) + " pontos";
+    somFim(); irPara("jogador-fim");
+  }
+}
+
+function desenharPergunta(sala){
+  const p = sala.pergunta || { texto:"", opcoes:[] };
+  $("jr-contagem").textContent = "Pergunta " + (sala.perguntaAtual + 1) + " de " + (sala.total || "?");
+  $("jr-enunciado").textContent = p.texto;
+  $("jr-aviso").style.display = "none";
+  const alvo = $("jr-alternativas"); alvo.innerHTML = "";
+  (p.opcoes || []).forEach((o,j) => {
+    const b = document.createElement("button");
+    b.className = "alt a" + (j+1);
+    b.innerHTML = '<span class="marca">' + MARCAS[j] + '</span><span>' + escapar(o) + '</span>';
+    b.onclick = () => responder(j, sala);
+    alvo.appendChild(b);
+  });
+  irPara("jogador-responder");
+
+  clearInterval(cronoJog);
+  const fim = (sala.inicioPergunta || Date.now()) + (sala.tempo || 20) * 1000;
+  const tick = () => {
+    const resta = Math.max(0, Math.ceil((fim - Date.now())/1000));
+    $("jr-tempo").textContent = resta + "s";
+    if (resta <= 0) clearInterval(cronoJog);
+  };
+  tick(); cronoJog = setInterval(tick, 250);
+}
+
+function responder(opcao, sala){
+  if (respondi) return;
+  respondi = true;
+  const tempoMs = Date.now() - (sala.inicioPergunta || Date.now());
+  salaRef(jogadorPin).child("respostas/" + sala.perguntaAtual + "/" + jogadorId).set({ opcao, tempoMs });
+  bip(520,.1);
+  document.querySelectorAll("#jr-alternativas .alt").forEach((b,j) => { if (j !== opcao) b.classList.add("apagada"); b.disabled = true; });
+  $("jr-aviso").style.display = "block";
+}
+
+function mostrarFeedback(sala, eu){
+  const res = sala.resultado || {};
+  const minha = ((sala.respostas || {})[sala.perguntaAtual] || {})[jogadorId];
+  const painel = $("jf-painel");
+  if (!minha) {
+    painel.className = "painel nok"; $("jf-icone").textContent = "\u23F1";
+    $("jf-msg").textContent = "Tempo esgotado"; $("jf-pts").textContent = "Sem pontos desta vez"; somErro();
+  } else if (minha.opcao === res.correta) {
+    painel.className = "painel ok"; $("jf-icone").textContent = "\u2713";
+    $("jf-msg").textContent = "Acertou!"; $("jf-pts").textContent = "+" + (minha.ganhos || 0) + " pontos"; somAcerto();
+  } else {
+    painel.className = "painel nok"; $("jf-icone").textContent = "\u2715";
+    $("jf-msg").textContent = "Não foi dessa vez"; $("jf-pts").textContent = "A certa era " + MARCAS[res.correta]; somErro();
+  }
+  $("jf-total").textContent = "Você tem " + ((eu && eu.pontos) || 0) + " pontos";
+  irPara("jogador-feedback");
+}
+
+/* PIN vindo pelo link/QR */
+const pinDaUrl = new URLSearchParams(location.search).get("pin");
+if (pinDaUrl && db) { $("in-pin").value = pinDaUrl; $("in-nome").focus(); }
+</script>
+</body>
+</html>
